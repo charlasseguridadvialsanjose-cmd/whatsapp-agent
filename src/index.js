@@ -1,5 +1,4 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
-import qrcode from 'qrcode';
 import pino from 'pino';
 import config from './config.js';
 import logger from './logger.js';
@@ -42,18 +41,18 @@ async function start() {
     }
   });
 
-  let qrDisplayed = false;
+  let lastQrLog = 0;
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr && !qrDisplayed) {
-      qrDisplayed = true;
-      logger.info('📱 Código QR generado. Escanealo desde el dashboard.');
-      qrcode.toDataURL(qr, { width: 400, margin: 2 }, (err, url) => {
-        if (!err) setQR(url, qr);
-      });
-      setTimeout(() => { qrDisplayed = false; }, 120000);
+    if (qr) {
+      setQR(qr);
+      const now = Date.now();
+      if (now - lastQrLog > 60000) {
+        lastQrLog = now;
+        logger.info('📱 Código QR generado. Escanealo desde el dashboard.');
+      }
     }
 
     if (connection === 'close') {
@@ -80,7 +79,6 @@ async function start() {
     if (connection === 'open') {
       logger.info('🚀  Agente WhatsApp listo y conectado!');
       setConnectionStatus('connected');
-      qrDisplayed = false;
 
       scheduler = new MessageScheduler(sock);
       scheduler.loadFromConfig();

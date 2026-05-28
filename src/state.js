@@ -1,12 +1,16 @@
+import qrcode from 'qrcode';
+
 let qrData = null;
 let qrString = null;
 let connectionStatus = 'disconnected';
 let qrCallbacks = [];
 
-export function setQR(dataUrl, rawString) {
-  qrData = dataUrl;
+export function setQR(rawString) {
   qrString = rawString;
-  qrCallbacks.forEach(cb => cb(dataUrl));
+  qrcode.toDataURL(rawString, { width: 400, margin: 2 }).then(url => {
+    qrData = url;
+    qrCallbacks.forEach(cb => cb(url));
+  }).catch(() => {});
 }
 
 export function getQR() {
