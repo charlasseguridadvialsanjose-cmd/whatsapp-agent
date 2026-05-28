@@ -9,6 +9,7 @@ import {
 } from './database.js';
 import { getQR, getQRString, getConnectionStatus } from './state.js';
 import logger from './logger.js';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +84,16 @@ export function createServer() {
 
   app.get('/api/connection-status', (req, res) => {
     res.json({ status: getConnectionStatus(), hasQR: !!getQR() });
+  });
+
+  app.get('/api/logs', (req, res) => {
+    const logPath = path.join(__dirname, '..', 'logs', 'combined.log');
+    try {
+      const lines = fs.readFileSync(logPath, 'utf-8').split('\n').filter(Boolean).slice(-50);
+      res.json({ lines });
+    } catch (e) {
+      res.json({ lines: ['(log no disponible)'] });
+    }
   });
 
   app.get('/api/health', (req, res) => {

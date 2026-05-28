@@ -8,7 +8,7 @@ import ConversationLogger from './conversationLogger.js';
 import Agent from './agent.js';
 import { initDB } from './database.js';
 import { startServer } from './server.js';
-import { setQR, setConnectionStatus } from './state.js';
+import { setQR, setConnectionStatus, clearQR } from './state.js';
 
 initDB();
 
@@ -64,6 +64,7 @@ async function start() {
       logger.info(`Conexión cerrada: código ${statusCode} (loggedOut=${loggedOut}, restart=${restartRequired})`);
 
       if (loggedOut) {
+        clearQR();
         logger.warn('Sesión cerrada. Escaneá el QR de nuevo.');
         return;
       }
@@ -74,9 +75,11 @@ async function start() {
       }
       logger.info('Reconectando en 5 segundos...');
       setTimeout(start, 5000);
+      return;
     }
 
     if (connection === 'open') {
+      clearQR();
       logger.info('🚀  Agente WhatsApp listo y conectado!');
       setConnectionStatus('connected');
 
@@ -89,7 +92,9 @@ async function start() {
         jobs.forEach((j) => logger.info(`  - ${j.name}: ${j.cronExpression} -> ${j.number}`));
       }
 
-      await agent.init();
+      agent.init().catch(err => {
+        logger.warn('agent.init() falló (no crítico):', { error: err.message });
+      });
     }
   });
 
@@ -98,7 +103,8 @@ async function start() {
 
     for (const msg of messages) {
       try {
-        if (msg.key.fromMe) continue;
+        if (!msg.key || msg.key.fromMe) continue;
+        if (!msg.key.remoteJid) continue;
         if (msg.key.remoteJid.endsWith('@g.us') && config.autoReply.ignoreGroups) continue;
 
         const from = msg.key.remoteJid;
@@ -134,7 +140,7 @@ async function start() {
           logger.info(`✅ Respuesta enviada a ${name}`);
         }
       } catch (error) {
-        logger.error('Error procesando mensaje:', { error: error.message });
+        logger.error('Error procesando mensaje:', { error: error.message, stack: error.stack });
         conversationLogger.logError(msg?.key?.remoteJid, msg?.message?.conversation, error);
       }
     }
@@ -149,8 +155,12 @@ async function start() {
   });
 }
 
-process.on('unhandledRejection', (reason) => {
-  logger.error('Unhandled Rejection:', { reason: reason?.message || reason });
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection:', { reason: reason?.message || reason, stack: reason?.stack });
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', { error: err.message, stack: err.stack });
 });
 
 logger.info('==========================================');

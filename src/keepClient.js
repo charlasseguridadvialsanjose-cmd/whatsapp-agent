@@ -1,11 +1,14 @@
 import { spawn } from 'child_process';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import logger from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const bridgeScript = path.join(__dirname, 'keep_bridge.py');
 const sessionFile = path.join(__dirname, '..', 'sessions', 'keep_session.json');
+const PYTHON = os.platform() === 'win32' ? 'python' : 'python3';
+const OPERATION_TIMEOUT = 15000;
 
 class KeepClient {
   constructor() {
@@ -17,13 +20,22 @@ class KeepClient {
 
   start() {
     return new Promise((resolve, reject) => {
-      this.process = spawn('python', ['-u', bridgeScript], {
+      let started = false;
+      this.process = spawn(PYTHON, ['-u', bridgeScript], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
           PYTHONUNBUFFERED: '1',
         },
       });
+
+      const timeout = setTimeout(() => {
+        if (!started) {
+          this.process.kill();
+          this.process = null;
+          reject(new Error(`Timeout iniciando ${PYTHON}`));
+        }
+      }, 5000);
 
       this.process.stdout.on('data', (data) => {
         this.buffer += data.toString();
@@ -47,17 +59,22 @@ class KeepClient {
       });
 
       this.process.on('error', (err) => {
-        logger.error('Error en proceso Keep bridge:', { error: err.message });
+        clearTimeout(timeout);
+        logger.error(`Error en proceso Keep bridge (${PYTHON}):`, { error: err.message });
         this.initialized = false;
-        reject(err);
+        this.process = null;
+        if (!started) reject(err);
       });
 
       this.process.on('exit', (code) => {
+        clearTimeout(timeout);
         logger.info(`Keep bridge terminado (código: ${code})`);
         this.initialized = false;
         this.process = null;
       });
 
+      started = true;
+      clearTimeout(timeout);
       this.initialized = true;
       resolve();
     });
@@ -69,7 +86,18 @@ class KeepClient {
     }
 
     return new Promise((resolve) => {
-      this.pending.push(resolve);
+      const timeout = setTimeout(() => {
+        const idx = this.pending.indexOf(resolve);
+        if (idx !== -1) this.pending.splice(idx, 1);
+        resolve({ success: false, error: 'Timeout' });
+      }, OPERATION_TIMEOUT);
+
+      const wrapped = (result) => {
+        clearTimeout(timeout);
+        resolve(result);
+      };
+
+      this.pending.push(wrapped);
       this.process.stdin.write(JSON.stringify(request) + '\n');
     });
   }

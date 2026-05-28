@@ -13,6 +13,11 @@ export function setQR(rawString) {
   }).catch(() => {});
 }
 
+export function clearQR() {
+  qrData = null;
+  qrString = null;
+}
+
 export function getQR() {
   return qrData;
 }
