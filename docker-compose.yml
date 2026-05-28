@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    container_name: whatsapp-agent
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./sessions:/app/sessions
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - TZ=America/Argentina/Buenos_Aires

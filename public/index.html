@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel - Agente WhatsApp Turnos</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin-bottom: 20px; color: #075e54; display: flex; align-items: center; gap: 10px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-card .number { font-size: 1.8rem; font-weight: 700; color: #075e54; }
+.stat-card .label { font-size: 0.8rem; color: #666; margin-top: 4px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+.card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.card h2 { font-size: 1.1rem; margin-bottom: 16px; color: #075e54; }
+label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 12px; margin-bottom: 4px; color: #555; }
+input, textarea, select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; font-family: inherit; }
+textarea { resize: vertical; min-height: 60px; }
+button { background: #075e54; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-top: 12px; }
+button:hover { background: #054d44; }
+button.danger { background: #dc3545; }
+button.danger:hover { background: #c82333; }
+button.secondary { background: #6c757d; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
+th { font-weight: 600; color: #555; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.badge-hcd { background: #e3f2fd; color: #1565c0; }
+.badge-cic { background: #f3e5f5; color: #7b1fa2; }
+.available { color: #2e7d32; font-weight: 600; }
+.full { color: #c62828; font-weight: 600; }
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab { padding: 6px 14px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.85rem; background: #e0e0e0; }
+.tab.active { background: white; font-weight: 600; color: #075e54; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.hint { font-size: 0.78rem; color: #888; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📱 Agente WhatsApp - Gestión de Turnos</h1>
+
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="number" id="stat-hoy">-</div><div class="label">Turnos hoy</div></div>
+    <div class="stat-card"><div class="number" id="stat-total">-</div><div class="label">Total turnos</div></div>
+    <div class="stat-card"><div class="number" id="stat-hcd">-</div><div class="label">Turnos HCD</div></div>
+    <div class="stat-card"><div class="number" id="stat-cic">-</div><div class="label">Turnos CIC</div></div>
+    <div class="stat-card"><div class="number" id="stat-schedules">-</div><div class="label">Horarios activos</div></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="turnos">Turnos</div>
+    <div class="tab" data-tab="horarios">Horarios</div>
+    <div class="tab" data-tab="config">Configuración</div>
+    <div class="tab" data-tab="instrucciones">Instrucciones IA</div>
+  </div>
+
+  <div class="grid">
+    <div id="tab-turnos" class="tab-content active">
+      <div class="card">
+        <h2>📋 Últimos turnos</h2>
+        <div style="margin-bottom: 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input id="filter-area" placeholder="Filtrar por área (HCD/CIC)" style="width:auto;flex:1;min-width:120px;">
+          <input id="filter-fecha" type="date" style="width:auto;">
+          <button onclick="loadAppointments()" style="margin:0;">Filtrar</button>
+          <a href="/api/appointments/export" style="margin-left:auto;font-size:0.85rem;color:#075e54;">⬇ Exportar CSV</a>
+        </div>
+        <div style="max-height:400px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Fecha</th><th>Área</th><th>Nombre</th><th>Teléfono</th><th>Hora</th></tr></thead>
+            <tbody id="appointments-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-horarios" class="tab-content">
+      <div class="card">
+        <h2>➕ Agregar horario</h2>
+        <form id="schedule-form">
+          <label>Área</label>
+          <select id="s-area" required>
+            <option value="HCD">HCD - Honorable Consejo Deliberante</option>
+            <option value="CIC">CIC - Centro Integrador Comunitario</option>
+          </select>
+          <label>Fecha</label>
+          <input type="date" id="s-fecha" required>
+          <label>Hora inicio</label>
+          <input type="time" id="s-hora-inicio" required>
+          <label>Hora fin</label>
+          <input type="time" id="s-hora-fin" required>
+          <label>Cupo máximo (0 = sin límite)</label>
+          <input type="number" id="s-cupo" value="10" min="0">
+          <button type="submit">Agregar horario</button>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2>🗓️ Horarios registrados</h2>
+        <div style="max-height:300px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Área</th><th>Fecha</th><th>Horario</th><th>Cupos</th><th></th></tr></thead>
+            <tbody id="schedules-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-config" class="tab-content">
+      <div class="card">
+        <h2>⚙️ Configuración general</h2>
+        <form id="config-form">
+          <label>Rol del negocio</label>
+          <input id="c-business-role" placeholder="Ej: asistente municipal">
+          <label>Tipo de negocio</label>
+          <input id="c-business-type" placeholder="Ej: municipalidad">
+          <label>Email Google Keep</label>
+          <input id="c-keep-email" placeholder="tu-email@gmail.com">
+          <p class="hint">La contraseña se configura en el archivo .env</p>
+          <button type="submit">Guardar configuración</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="tab-instrucciones" class="tab-content">
+      <div class="card">
+        <h2>🤖 Instrucciones para la IA</h2>
+        <form id="instructions-form">
+          <label>Instrucciones para turnos HCD</label>
+          <textarea id="i-hcd" rows="4" placeholder="Ej: Pedir DNI, domicilio, motivo de la consulta..."></textarea>
+          <label>Instrucciones para turnos CIC</label>
+          <textarea id="i-cic" rows="4" placeholder="Ej: Pedir DNI, obra social, teléfono de contacto..."></textarea>
+          <label>Reglas generales de turnos</label>
+          <textarea id="i-rules" rows="4" placeholder="Ej: Solo se dan turnos de lunes a viernes, máximo 2 turnos por persona..."></textarea>
+          <button type="submit">Guardar instrucciones</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => showTab(t.dataset.tab));
+});
+
+async function loadStats() {
+  const r = await fetch('/api/stats');
+  const d = await r.json();
+  document.getElementById('stat-hoy').textContent = d.hoy;
+  document.getElementById('stat-total').textContent = d.total;
+  document.getElementById('stat-hcd').textContent = d.hcd;
+  document.getElementById('stat-cic').textContent = d.cic;
+  document.getElementById('stat-schedules').textContent = d.schedulesActivas;
+}
+
+async function loadAppointments() {
+  const area = document.getElementById('filter-area').value;
+  const fecha = document.getElementById('filter-fecha').value;
+  const params = new URLSearchParams();
+  if (area) params.set('area', area);
+  if (fecha) params.set('fecha', fecha);
+  const r = await fetch('/api/appointments?' + params.toString());
+  const data = await r.json();
+  const tbody = document.getElementById('appointments-table');
+  tbody.innerHTML = data.map(a => `
+    <tr>
+      <td>${a.fecha_turno}</td>
+      <td><span class="badge ${a.area === 'HCD' ? 'badge-hcd' : 'badge-cic'}">${a.area}</span></td>
+      <td>${a.nombre}</td>
+      <td>${a.telefono}</td>
+      <td>${a.hora_turno || '-'}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadSchedules() {
+  const r = await fetch('/api/schedules');
+  const data = await r.json();
+  const tbody = document.getElementById('schedules-table');
+  tbody.innerHTML = data.map(s => `
+    <tr>
+      <td><span class="badge ${s.area === 'HCD' ? 'badge-hcd' : 'badge-cic'}">${s.area}</span></td>
+      <td>${s.fecha}</td>
+      <td>${s.hora_inicio} - ${s.hora_fin}</td>
+      <td class="${s.cupos_usados >= s.cupo_maximo ? 'full' : 'available'}">${s.cupos_usados}/${s.cupo_maximo}</td>
+      <td><button class="danger" onclick="deleteSchedule(${s.id})" style="margin:0;padding:4px 10px;font-size:0.75rem;">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('Eliminar este horario?')) return;
+  await fetch('/api/schedules/' + id, { method: 'DELETE' });
+  loadSchedules();
+  loadStats();
+}
+
+async function loadConfig() {
+  const r = await fetch('/api/config');
+  const d = await r.json();
+  document.getElementById('c-business-role').value = d.businessRole || '';
+  document.getElementById('c-business-type').value = d.businessType || '';
+  document.getElementById('c-keep-email').value = d.keepEmail || '';
+  document.getElementById('i-hcd').value = d.hcdInstructions || '';
+  document.getElementById('i-cic').value = d.cicInstructions || '';
+  document.getElementById('i-rules').value = d.appointmentRules || '';
+}
+
+document.getElementById('schedule-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await fetch('/api/schedules', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      area: document.getElementById('s-area').value,
+      fecha: document.getElementById('s-fecha').value,
+      hora_inicio: document.getElementById('s-hora-inicio').value,
+      hora_fin: document.getElementById('s-hora-fin').value,
+      cupo_maximo: parseInt(document.getElementById('s-cupo').value),
+    }),
+  });
+  e.target.reset();
+  loadSchedules();
+  loadStats();
+});
+
+document.getElementById('config-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  for (const [key, fieldId] of [['businessRole','c-business-role'], ['businessType','c-business-type'], ['keepEmail','c-keep-email']]) {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: document.getElementById(fieldId).value }),
+    });
+  }
+  alert('Configuración guardada');
+});
+
+document.getElementById('instructions-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  for (const [key, fieldId] of [['hcdInstructions','i-hcd'], ['cicInstructions','i-cic'], ['appointmentRules','i-rules']]) {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: document.getElementById(fieldId).value }),
+    });
+  }
+  alert('Instrucciones guardadas');
+});
+
+loadStats();
+loadAppointments();
+loadSchedules();
+loadConfig();
+setInterval(loadStats, 10000);
+</script>
+</body>
+</html>
