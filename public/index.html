@@ -121,10 +121,10 @@ th { font-weight: 600; color: #555; }
           </select>
           <label>Fecha</label>
           <input type="date" id="s-fecha" required>
-          <label>Hora inicio</label>
-          <input type="time" id="s-hora-inicio" required>
-          <label>Hora fin</label>
-          <input type="time" id="s-hora-fin" required>
+          <label>Hora inicio <span class="hint">(Formato 24h, ej: 18:00)</span></label>
+          <input type="time" id="s-hora-inicio" step="60" required>
+          <label>Hora fin <span class="hint">(Formato 24h, ej: 20:00)</span></label>
+          <input type="time" id="s-hora-fin" step="60" required>
           <label>Cupo máximo (0 = sin límite)</label>
           <input type="number" id="s-cupo" value="10" min="0">
           <button type="submit">Agregar horario</button>
