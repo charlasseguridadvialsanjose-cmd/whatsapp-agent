@@ -104,8 +104,16 @@ async function start() {
         if (msg.key.remoteJid.endsWith('@g.us') && config.autoReply.ignoreGroups) continue;
 
         const from = msg.key.remoteJid;
-        const messageText = msg.message?.conversation
-          || msg.message?.extendedTextMessage?.text
+
+        let msgContent = msg.message;
+        if (msgContent?.ephemeralMessage?.message) {
+          msgContent = msgContent.ephemeralMessage.message;
+        }
+
+        const messageText = msgContent?.conversation
+          || msgContent?.extendedTextMessage?.text
+          || msgContent?.imageMessage?.caption
+          || msgContent?.videoMessage?.caption
           || '';
 
         if (!messageText.trim()) continue;
