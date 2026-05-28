@@ -40,26 +40,34 @@ async function start() {
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr) {
+    if (qr && !qrDisplayed) {
       qrDisplayed = true;
-      logger.info('📱 Código QR generado. Abrí el dashboard para escanearlo.');
+      logger.info('📱 Código QR generado. Escanealo desde el dashboard.');
       qrcode.toDataURL(qr, { width: 400, margin: 2 }, (err, url) => {
         if (!err) setQR(url, qr);
       });
-      setTimeout(() => { qrDisplayed = false; }, 60000);
+      setTimeout(() => { qrDisplayed = false; }, 120000);
     }
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
+      const restartRequired = statusCode === DisconnectReason.restartRequired;
 
       setConnectionStatus('disconnected');
+      logger.info(`Conexión cerrada: código ${statusCode} (loggedOut=${loggedOut}, restart=${restartRequired})`);
+
       if (loggedOut) {
         logger.warn('Sesión cerrada. Escaneá el QR de nuevo.');
-      } else {
-        logger.info('Reconectando en 5 segundos...');
-        setTimeout(start, 5000);
+        return;
       }
+      if (restartRequired) {
+        logger.info('Reconexión requerida por Baileys. Reintentando...');
+        setTimeout(start, 1000);
+        return;
+      }
+      logger.info('Reconectando en 5 segundos...');
+      setTimeout(start, 5000);
     }
 
     if (connection === 'open') {
