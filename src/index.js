@@ -31,9 +31,16 @@ async function start() {
     browser: ['WhatsApp Agent', 'Chrome', '1.0'],
     logger: loggerPino,
     syncFullHistory: false,
+    shouldSyncHistory: false,
   });
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', async () => {
+    try {
+      await saveCreds();
+    } catch (e) {
+      logger.error('Error guardando credenciales:', { error: e.message });
+    }
+  });
 
   let qrDisplayed = false;
 
@@ -62,8 +69,8 @@ async function start() {
         return;
       }
       if (restartRequired) {
-        logger.info('Reconexión requerida por Baileys. Reintentando...');
-        setTimeout(start, 1000);
+        logger.info('Reconexión requerida por Baileys. Reintentando en 3s...');
+        setTimeout(start, 3000);
         return;
       }
       logger.info('Reconectando en 5 segundos...');
