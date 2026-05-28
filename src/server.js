@@ -7,6 +7,7 @@ import {
   getSchedules, getScheduleForArea, addSchedule, deleteSchedule,
   getAppointments, getTodayStats, exportAppointmentsCSV, hasAvailableSlots, getAvailableDates
 } from './database.js';
+import { getQR, getQRString, getConnectionStatus } from './state.js';
 import logger from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,16 @@ export function createServer() {
   app.get('/api/availability/:area', (req, res) => {
     const dates = getAvailableDates(req.params.area);
     res.json(dates);
+  });
+
+  app.get('/api/qr', (req, res) => {
+    const qr = getQR();
+    const raw = getQRString();
+    res.json({ qr, raw, status: getConnectionStatus() });
+  });
+
+  app.get('/api/connection-status', (req, res) => {
+    res.json({ status: getConnectionStatus(), hasQR: !!getQR() });
   });
 
   app.get('/api/health', (req, res) => {

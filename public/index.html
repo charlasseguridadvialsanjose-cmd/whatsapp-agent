@@ -39,11 +39,42 @@ th { font-weight: 600; color: #555; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 .hint { font-size: 0.78rem; color: #888; margin-top: 4px; }
+.qr-banner { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; display: none; text-align: center; }
+.qr-banner.active { display: block; }
+.qr-banner img { width: 280px; height: 280px; image-rendering: pixelated; border: 8px solid white; border-radius: 8px; }
+.qr-banner .steps { text-align: left; max-width: 400px; margin: 0 auto; font-size: 0.9rem; line-height: 1.6; }
+.qr-banner .steps li { margin-bottom: 6px; }
+.status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; margin-bottom: 16px; }
+.status-bar.connected { background: #e8f5e9; color: #2e7d32; }
+.status-bar.disconnected { background: #fff3e0; color: #e65100; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.status-dot.connected { background: #2e7d32; }
+.status-dot.disconnected { background: #e65100; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>📱 Agente WhatsApp - Gestión de Turnos</h1>
+
+  <div class="status-bar" id="status-bar">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">Conectando...</span>
+  </div>
+
+  <div class="qr-banner" id="qr-banner">
+    <h2 style="margin-bottom:12px;color:#075e54;">📲 Escaneá este código QR</h2>
+    <div id="qr-container"><img id="qr-image" src="" alt="Código QR de WhatsApp"></div>
+    <div class="steps">
+      <p style="font-weight:600;margin-top:12px;">Pasos para conectar:</p>
+      <ol>
+        <li>Tomá el <strong>celular de la municipalidad</strong> que tiene WhatsApp</li>
+        <li>Abrí WhatsApp → <strong>Ajustes</strong> → <strong>Dispositivos vinculados</strong></li>
+        <li>Tocá <strong>Vincular dispositivo</strong></li>
+        <li>Apuntá la cámara al código QR de arriba</li>
+      </ol>
+      <p style="margin-top:12px;font-size:0.85rem;color:#888;">El QR se actualiza cada 60 segundos. Refrescá la página si venció.</p>
+    </div>
+  </div>
 
   <div class="stats" id="stats">
     <div class="stat-card"><div class="number" id="stat-hoy">-</div><div class="label">Turnos hoy</div></div>
@@ -156,6 +187,38 @@ document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => showTab(t.dataset.tab));
 });
 
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/qr');
+    const d = await r.json();
+    const bar = document.getElementById('status-bar');
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const banner = document.getElementById('qr-banner');
+    const img = document.getElementById('qr-image');
+
+    if (d.status === 'connected') {
+      bar.className = 'status-bar connected';
+      dot.className = 'status-dot connected';
+      text.textContent = '✅ Conectado a WhatsApp';
+      banner.classList.remove('active');
+    } else if (d.qr) {
+      bar.className = 'status-bar disconnected';
+      dot.className = 'status-dot disconnected';
+      text.textContent = '📱 Escaneá el QR para conectar';
+      banner.classList.add('active');
+      img.src = d.qr;
+    } else {
+      bar.className = 'status-bar disconnected';
+      dot.className = 'status-dot disconnected';
+      text.textContent = '⏳ Esperando código QR...';
+      banner.classList.remove('active');
+    }
+  } catch (e) {
+    console.error('Error checking status:', e);
+  }
+}
+
 async function loadStats() {
   const r = await fetch('/api/stats');
   const d = await r.json();
@@ -261,10 +324,12 @@ document.getElementById('instructions-form').addEventListener('submit', async (e
   alert('Instrucciones guardadas');
 });
 
+loadStatus();
 loadStats();
 loadAppointments();
 loadSchedules();
 loadConfig();
+setInterval(loadStatus, 3000);
 setInterval(loadStats, 10000);
 </script>
 </body>

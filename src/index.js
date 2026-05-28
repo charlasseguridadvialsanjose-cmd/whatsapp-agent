@@ -1,5 +1,5 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
-import qrcode from 'qrcode-terminal';
+import qrcode from 'qrcode';
 import pino from 'pino';
 import config from './config.js';
 import logger from './logger.js';
@@ -9,6 +9,7 @@ import ConversationLogger from './conversationLogger.js';
 import Agent from './agent.js';
 import { initDB } from './database.js';
 import { startServer } from './server.js';
+import { setQR, setConnectionStatus } from './state.js';
 
 initDB();
 
@@ -39,17 +40,20 @@ async function start() {
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr && !qrDisplayed) {
+    if (qr) {
       qrDisplayed = true;
-      logger.info('Escanea este código QR con WhatsApp:');
-      qrcode.generate(qr, { small: true });
-      setTimeout(() => { qrDisplayed = false; }, 30000);
+      logger.info('📱 Código QR generado. Abrí el dashboard para escanearlo.');
+      qrcode.toDataURL(qr, { width: 400, margin: 2 }, (err, url) => {
+        if (!err) setQR(url, qr);
+      });
+      setTimeout(() => { qrDisplayed = false; }, 60000);
     }
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
+      setConnectionStatus('disconnected');
       if (loggedOut) {
         logger.warn('Sesión cerrada. Escaneá el QR de nuevo.');
       } else {
@@ -60,6 +64,7 @@ async function start() {
 
     if (connection === 'open') {
       logger.info('🚀  Agente WhatsApp listo y conectado!');
+      setConnectionStatus('connected');
       qrDisplayed = false;
 
       scheduler = new MessageScheduler(sock);
